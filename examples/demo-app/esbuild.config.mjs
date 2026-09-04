@@ -13,6 +13,11 @@ import {dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import KeplerPackage from '../../package.json' assert {type: 'json'};
 
+import startDiagnostics from './start-diagnostics.js';
+
+const {TAILWIND_BIN, attachSpawnDiagnostics, findMissingStartInputs, formatMissingStartInputs} =
+  startDiagnostics;
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const args = process.argv;
@@ -343,9 +348,17 @@ function openURL(url) {
     win32: ['cmd', '/c', 'start']
   };
   const command = cmd[process.platform];
-  if (command) {
-    spawn(command[0], [...command.slice(1), url]);
+  if (!command) {
+    return;
   }
+
+  // Opening a browser is a convenience, never a requirement: headless
+  // containers have no `xdg-open`, and without an error listener its ENOENT
+  // becomes an uncaught exception that takes the dev server down with it.
+  attachSpawnDiagnostics(spawn(command[0], [...command.slice(1), url]), {
+    command: command[0],
+    fatal: false
+  });
 }
 
 (async () => {
@@ -437,6 +450,18 @@ function openURL(url) {
   }
 
   if (args.includes('--start')) {
+    // Fail loudly on a half-finished install. Without this the missing
+    // tailwindcss binary surfaced as an async spawn ENOENT and the missing
+    // entry point/index.html as an esbuild error, both of which left the
+    // preview showing a bare `Not Found` with no named cause.
+    const missingInputs = findMissingStartInputs(process.cwd());
+    if (missingInputs.length) {
+      console.error(
+        formatMissingStartInputs(missingInputs, process.cwd(), 'node esbuild.config.mjs --start')
+      );
+      process.exit(1);
+    }
+
     const isLocal = process.env.NODE_ENV === 'local';
     const baseAliases = isLocal ? localAliases : getThirdPartyLibraryAliases(false);
     const nodeModulesDir = isLocal ? NODE_MODULES_DIR : BASE_NODE_MODULES_DIR;
@@ -444,14 +469,21 @@ function openURL(url) {
     // --env.deck / --env.deck_src aliases are not overridden by the plugin.
     const useDeckOverride = args.includes('--env.deck') || args.includes('--env.deck_src');
 
-    // Start Tailwind CSS watcher for sqlrooms UI components
-    spawn(
-      './node_modules/.bin/tailwindcss',
+    // Start Tailwind CSS watcher for sqlrooms UI components.
+    // The preflight above proves the binary is on disk; this listener covers
+    // what it cannot (a non-executable file, a broken .bin symlink) so the
+    // cause is printed instead of thrown as an uncaught ENOENT.
+    const tailwind = spawn(
+      TAILWIND_BIN,
       ['-i', 'src/styles.css', '-o', 'dist/tailwind.css', '--watch'],
       {
         stdio: 'inherit'
       }
     );
+    attachSpawnDiagnostics(tailwind, {
+      command: TAILWIND_BIN,
+      onFailure: () => process.exit(1)
+    });
 
     await esbuild
       .context({
