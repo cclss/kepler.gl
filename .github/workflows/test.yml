@@ -22,6 +22,12 @@ jobs:
       # use Volta to manage yarn/node versions
       - uses: volta-cli/action@v4
 
+      # Runs before `yarn install` and needs no dependencies: a toolchain drift
+      # between .tool-versions/.nvmrc/volta/packageManager is exactly what makes
+      # the install below resolve a different Node than contributors use locally.
+      - name: Check tool version consistency
+        run: node ./scripts/check-tool-versions.js
+
       - name: Get Yarn cache directory
         id: yarn-cache-dir
         run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
