@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Development Setup](./#development-setup)
+- [Pinned tool versions](./#pinned-tool-versions)
 - [Troubleshooting: gl package install](./#troubleshooting-gl-package-install)
 - [Running Tests](./#running-tests)
 - [Coding Rules](./#coding-rules)
@@ -23,18 +24,22 @@ Before you can build Kepler.gl, you must install and configure the following dep
 
 - [Git](http://git-scm.com/): The [Github Guide to Installing Git][git-setup] is a good source of information.
 
-- [Node.js ^20.x](http://nodejs.org): We use Node to generate the documentation, run a
-  development web server, run tests, and generate distributable files. Depending on your system,
-  you can install Node either from source or as a pre-packaged bundle.
-
-  We recommend using [nvm](https://github.com/creationix/nvm) (or
-  [nvm-windows](https://github.com/coreybutler/nvm-windows))
-  to manage and install Node.js, which makes it easy to change the version of Node.js per project.
+- [Node.js 20.19.3](http://nodejs.org): We use Node to generate the documentation, run a
+  development web server, run tests, and generate distributable files. This repository pins
+  **Node 20.19.3** — the root `package.json` declares `"engines": {"node": ">=20.19.3 <21"}`,
+  and newer Node versions break the `gl` dev dependency (see
+  [Troubleshooting: gl package install](#troubleshooting-gl-package-install)).
 
 - [Yarn 4.4.0](https://yarnpkg.com): We use Yarn to install our Node.js module dependencies
-  (rather than using npm). See the detailed [installation instructions][yarn-install].
+  (rather than using npm). The root `package.json` declares `"packageManager": "yarn@4.4.0"`,
+  so Corepack activates that exact version. See the detailed
+  [installation instructions][yarn-install].
 
-- [Volta](https://volta.sh/): We use Volta to manage Node and Yarn versions without you manually switching them
+- A version manager that reads the repo-root pin: [Volta](https://volta.sh/),
+  [mise](https://mise.jdx.dev/), [asdf](https://asdf-vm.com/) or
+  [nvm](https://github.com/creationix/nvm) (or
+  [nvm-windows](https://github.com/coreybutler/nvm-windows)). Any of them works — see
+  [Pinned tool versions](#pinned-tool-versions) below.
 
 #### Fork Kepler.gl Repo
 
@@ -62,21 +67,59 @@ cd kepler.gl
 git remote add upstream "git@github.com:keplergl/kepler.gl.git"
 ```
 
-Install [volta](https://docs.volta.sh/guide/getting-started)
-On Unix, MacOS
+#### Pinned tool versions
+
+Node **20.19.3** and Yarn **4.4.0** are pinned at the repository root. Four declarations carry
+the same pair, and `yarn check-tool-versions` fails if they ever drift apart:
+
+| Declaration                       | Read by    | Value                          |
+| --------------------------------- | ---------- | ------------------------------ |
+| `.tool-versions`                  | mise, asdf | `nodejs 20.19.3`, `yarn 4.4.0` |
+| `.nvmrc`                          | nvm        | `20.19.3`                      |
+| `package.json` → `volta`          | Volta      | node `20.19.3`, yarn `4.4.0`   |
+| `package.json` → `packageManager` | Corepack   | `yarn@4.4.0`                   |
+
+Pick the manager you already use. Each command below is run from the repository root and
+selects the same versions.
+
+Install [Volta](https://docs.volta.sh/guide/getting-started), which picks up the `volta` field
+of `package.json` as soon as you `cd` into the repository:
 
 ```bash
-# install Volta on Unix
+# install Volta on Unix, MacOS
 curl https://get.volta.sh | bash
+
+# install Volta on Windows
+winget install Volta.Volta
+
+# pin the toolchain for this repository
+volta install node@20.19.3 yarn@4.4.0
 ```
 
-On Windows
+Or install [mise](https://mise.jdx.dev/getting-started.html), which reads `.tool-versions`:
 
 ```bash
-winget install Volta.Volta
+# install the pinned Node and Yarn
+mise install
+
+# confirm mise resolved the repo-root pin
+mise current
 ```
 
-Install `nvm` to set the proper Node.js version for the project. Follow instructions to install nvm [here](https://github.com/nvm-sh/nvm).
+Or install [asdf](https://asdf-vm.com/guide/getting-started.html), which also reads
+`.tool-versions`:
+
+```bash
+# add the plugins once
+asdf plugin add nodejs
+asdf plugin add yarn
+
+# install the pinned Node and Yarn
+asdf install
+```
+
+Or install [nvm](https://github.com/nvm-sh/nvm), which reads `.nvmrc` and leaves Yarn to
+Corepack:
 
 ```bash
 # Install the proper Node.js version for the Kepler.gl project
@@ -87,6 +130,17 @@ nvm use
 
 # Enable Yarn
 corepack enable
+```
+
+Whichever you chose, confirm the toolchain before installing dependencies:
+
+```bash
+# Node and Yarn resolve to the pinned versions
+node --version  # v20.19.3
+yarn --version  # 4.4.0
+
+# every declaration above still agrees
+yarn check-tool-versions
 ```
 
 Install dependencies with Yarn
@@ -131,7 +185,7 @@ Yarn may report that the `gl` package (a dev dependency used for headless WebGL 
 
 **What to do**
 
-- **Prefer the Node version pinned for this repo** (see `.nvmrc`, currently 20.19.3). After `nvm install` and `nvm use` (or Volta, as above), run `yarn install` / `yarn bootstrap` again. A matching prebuild is often available, so the native compile step never runs.
+- **Prefer the Node version pinned for this repo** — Node 20.19.3, declared in `.tool-versions`, `.nvmrc` and the `volta` field of `package.json`. Activate it with your version manager (`mise install`, `asdf install`, `nvm install && nvm use`, or Volta, as described in [Pinned tool versions](#pinned-tool-versions)), confirm with `node --version` and `yarn check-tool-versions`, then run `yarn install` / `yarn bootstrap` again. A matching prebuild is published for Node 20.19.3, so the native compile step never runs.
 
 - **If you must use a newer Node** and the install compiles from source, ensure `python` is on your `PATH` and points to Python 3, for example on macOS:
 
