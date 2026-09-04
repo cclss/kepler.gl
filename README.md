@@ -51,7 +51,29 @@ Kepler.gl is also a React component that uses [Redux](https://redux.js.org/) to 
 
 ## Env
 
-For **developing this repository**, use Node **20.19.3** (see `.nvmrc`): run `nvm install` and `nvm use`. Newer Node versions can make `yarn install` / `yarn bootstrap` try to compile the `gl` dev dependency from source; if that fails, see [Troubleshooting: gl package install](contributing/DEVELOPERS.md#troubleshooting-gl-package-install).
+For **developing this repository**, use Node **20.19.3** and Yarn **4.4.0**. Both versions are pinned at the repository root — `.tool-versions` (mise, asdf), `.nvmrc` (nvm) and the `volta` field of `package.json` all declare the same pair, and `packageManager` declares `yarn@4.4.0`. Whichever manager you use, point it at the repository root and it selects the pinned versions:
+
+```bash
+# Volta — reads package.json "volta"
+volta install node@20.19.3 yarn@4.4.0
+
+# mise — reads .tool-versions
+mise install
+
+# asdf — reads .tool-versions
+asdf install
+
+# nvm — reads .nvmrc, then enable Corepack for Yarn
+nvm install && nvm use && corepack enable
+```
+
+Verify that every declaration still agrees before installing:
+
+```bash
+yarn check-tool-versions
+```
+
+Newer Node versions can make `yarn install` / `yarn bootstrap` try to compile the `gl` dev dependency from source; if that fails, see [Troubleshooting: gl package install](contributing/DEVELOPERS.md#troubleshooting-gl-package-install).
 
 When **using kepler.gl as a dependency** in your own app, use Node 20.19.3 or a supported LTS; older Node versions are not supported or tested.
 
