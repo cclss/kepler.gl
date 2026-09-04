@@ -14,9 +14,12 @@ import {fileURLToPath} from 'node:url';
 import KeplerPackage from '../../package.json' assert {type: 'json'};
 
 import startDiagnostics from './start-diagnostics.js';
+import serveOptionsModule from './serve-options.js';
 
 const {TAILWIND_BIN, attachSpawnDiagnostics, findMissingStartInputs, formatMissingStartInputs} =
   startDiagnostics;
+const {describeServeOptionError, formatServeTarget, resolveServeOptions, serveUrl} =
+  serveOptionsModule;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -33,8 +36,6 @@ const EXTERNAL_DECK_SRC = join(LIB_DIR, 'deck.gl');
 
 // For debugging loaders.gl, load loaders.gl from external loaders.gl directory
 const EXTERNAL_LOADERS_SRC = join(LIB_DIR, 'loaders.gl');
-
-const port = 8080;
 
 /**
  * Run the demo against the local kepler.gl source tree instead of the published
@@ -450,6 +451,17 @@ function openURL(url) {
   }
 
   if (args.includes('--start')) {
+    // Resolve the listen address before any work: an unusable PORT must be
+    // reported as such, not silently replaced by the default — a preview
+    // pointed at the requested port would otherwise see nothing at all.
+    let serveOptions;
+    try {
+      serveOptions = resolveServeOptions(process.env);
+    } catch (error) {
+      console.error(describeServeOptionError(error));
+      process.exit(1);
+    }
+
     // Fail loudly on a half-finished install. Without this the missing
     // tailwindcss binary surfaced as an async spawn ENOENT and the missing
     // entry point/index.html as an esbuild error, both of which left the
@@ -506,18 +518,23 @@ function openURL(url) {
         checkEnvVariables();
 
         await ctx.watch();
-        await ctx.serve({
-          servedir: 'dist',
-          port,
-          fallback: 'dist/index.html',
+        // Bind explicitly instead of relying on esbuild's defaults, so the
+        // address a preview is wired to is a property of this repo and not of
+        // the installed esbuild version.
+        const served = await ctx.serve({
+          host: serveOptions.host,
+          port: serveOptions.port,
+          servedir: serveOptions.servedir,
+          fallback: serveOptions.fallback,
           onRequest: ({remoteAddress, method, path, status, timeInMS}) => {
             console.info(remoteAddress, status, `"${method} ${path}" [${timeInMS}ms]`);
           }
         });
-        console.info(
-          `kepler.gl demo app running at ${`http://localhost:${port}`}, press Ctrl+C to stop`
-        );
-        openURL(`http://localhost:${port}`);
+
+        // esbuild reports the port it actually bound; the host is ours.
+        const target = {host: serveOptions.host, port: served?.port ?? serveOptions.port};
+        console.info(formatServeTarget(target));
+        openURL(serveUrl(target));
       })
       .catch(e => {
         console.error(e);

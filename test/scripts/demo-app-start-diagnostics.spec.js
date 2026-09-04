@@ -15,6 +15,8 @@ const {
   formatMissingStartInputs
 } = require('../../examples/demo-app/start-diagnostics');
 
+const {SERVE_FALLBACK} = require('../../examples/demo-app/serve-options');
+
 const DEMO_APP_CONFIG = path.resolve(__dirname, '../../examples/demo-app/esbuild.config.mjs');
 const START_COMMAND = 'node esbuild.config.mjs --start';
 
@@ -79,10 +81,13 @@ describe('findMissingStartInputs', () => {
       'src/main.js'
     ]);
     // The watcher spawns the shared constant, and esbuild is pointed at the
-    // same entry point / SPA fallback the preflight checks for.
+    // same entry point / SPA fallback the preflight checks for. The fallback
+    // now lives in serve-options.js, so it is checked at its source and
+    // through the wiring rather than as a literal in the config.
     expect(config).toMatch(/spawn\(\s*TAILWIND_BIN/);
     expect(config).toContain("entryPoints: ['src/main.js']");
-    expect(config).toContain("fallback: 'dist/index.html'");
+    expect(SERVE_FALLBACK).toBe('dist/index.html');
+    expect(config).toMatch(/fallback:\s*serveOptions\.fallback/);
   });
 });
 
