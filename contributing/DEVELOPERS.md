@@ -4,7 +4,9 @@
 
 - [Development Setup](./#development-setup)
 - [Pinned tool versions](./#pinned-tool-versions)
+- [Dev server address and SPA fallback](./#dev-server-address-and-spa-fallback)
 - [Troubleshooting: gl package install](./#troubleshooting-gl-package-install)
+- [Troubleshooting: demo app start failures](./#troubleshooting-demo-app-start-failures)
 - [Running Tests](./#running-tests)
 - [Coding Rules](./#coding-rules)
 - [Commit Message Guidelines](./#git-commit-guidelines)
@@ -173,6 +175,27 @@ An demo app will be served at `http://localhost:8080/`
 
 This is the demo app we hosted on [http://kepler.gl/#/demo][demo-app]. By default, it serves non-minified source code inside the src directory.
 
+### Dev server address and SPA fallback
+
+`yarn start` hands `examples/demo-app` to `scripts/install-and-start.js`, which installs the example
+if anything is missing and then runs `node esbuild.config.mjs --start` in that folder. That dev
+server binds to **`http://0.0.0.0:8080`** — every interface, port `8080` — and prints the bind it
+resolved before it starts serving:
+
+```
+kepler.gl demo app listening on 0.0.0.0:8080 — open http://localhost:8080, press Ctrl+C to stop
+```
+
+- **Connect previews, port forwards and container port mappings to `8080`.** It is the port the app
+  actually listens on; a preview wired to any other port has nothing to show.
+- **Deep links and refreshes return the app.** Every path that matches no built file falls back to
+  `dist/index.html` (SPA fallback), so `http://localhost:8080/demo/map` and a browser reload both
+  render the demo app rather than `Not Found`.
+- **`HOST` and `PORT` override the bind** (for example `PORT=3000 yarn start`). A `PORT` that is not
+  a usable port number aborts the start with a named error instead of silently falling back to
+  `8080` — a silent fallback would put the server on an address nobody asked for, which is exactly
+  the `Not Found` symptom above.
+
 ### Troubleshooting: gl package install
 
 Yarn may report that the `gl` package (a dev dependency used for headless WebGL in tests) **could not be built**. That usually happens for one of two reasons:
@@ -207,6 +230,24 @@ npm run start:deck
 // load deck.gl src from the deck.gl folder parallel to kepler.gl
 npm run start:deck-src
 ```
+
+### Troubleshooting: demo app start failures
+
+A preview that shows `Not Found` almost always means the dev server never came up, or the preview is
+connected to a port other than `8080`. Read the terminal first: every failure on the start path
+prints a `✖` block that names the folder, the command and the cause, so a half-finished install no
+longer ends as a silent `Not Found`.
+
+| Message                                                            | Cause                                                                                              | What to do                                                                                                                |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `✖ demo-app --start failed: N required input(s) missing`           | The start command checks its inputs first. Each entry lists the path, its role and a fix.          | A missing `./node_modules/.bin/tailwindcss` means the example install never finished — run `yarn` in `examples/demo-app`. |
+| `✖ demo-app --start failed: "<command>" not found on this system`  | The named executable could not be spawned (a broken `.bin` symlink, a non-executable file).        | Install it, or re-run the install that was supposed to provide it.                                                        |
+| `✖ demo-app --start failed: PORT="…" is not a usable port`         | `PORT` is set to something other than an integer between 1 and 65535.                              | Unset `PORT` to use `8080`, or give it a real port number.                                                                |
+| `⚠️  "<command>" not found on this system — continuing without it` | An optional helper failed — typically the browser opener on a headless machine.                    | Nothing: the server keeps serving. Open the printed address yourself.                                                     |
+| `✖ install-and-start failed: …`                                    | The repo-root launcher stopped before the app started; it names the folder, command and exit code. | Fix the reported cause and re-run `yarn start`.                                                                           |
+
+If nothing at all is printed, the server is running and reachable at `8080` — check what the preview
+is connected to before changing anything in the app.
 
 ## Running Tests
 
